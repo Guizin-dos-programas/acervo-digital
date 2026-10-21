@@ -1,19 +1,16 @@
+
 package com.trabalho.sistema_biblioteca.dto.response;
 
 import com.trabalho.sistema_biblioteca.model.Usuario;
 import com.trabalho.sistema_biblioteca.model.enums.TipoUsuario;
 
 public record UsuarioResponseDto(
-
         Long id,
         String nome,
         String cpf,
         String email,
         TipoUsuario tipo,
-        String status
-
-) {
-
+        String status) {
     public UsuarioResponseDto(Usuario usuario) {
         this(
                 usuario.getId(),
@@ -21,7 +18,6 @@ public record UsuarioResponseDto(
                 usuario.getCpf(),
                 usuario.getEmail(),
                 usuario.getTipo(),
-                usuario.getStatus()
-        );
+                usuario.getStatus().name());
     }
 }
