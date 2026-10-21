@@ -4,59 +4,59 @@ import com.trabalho.sistema_biblioteca.dto.request.UsuarioRequestDto;
 import com.trabalho.sistema_biblioteca.dto.response.UsuarioResponseDto;
 import com.trabalho.sistema_biblioteca.exception.EntidadeJaCadastradaException;
 import com.trabalho.sistema_biblioteca.exception.EntidadeNaoEncontradaException;
+import com.trabalho.sistema_biblioteca.exception.RegraNegocioException;
 import com.trabalho.sistema_biblioteca.model.Usuario;
+import com.trabalho.sistema_biblioteca.model.enums.TipoUsuario;
 import com.trabalho.sistema_biblioteca.repository.UsuarioRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class UsuarioService {
+    private final UsuarioRepository usuarios;
+    private final PasswordEncoder senhaEncoder;
 
-    private final UsuarioRepository usuarioRepository;
-    private final PasswordEncoder passwordEncoder;
-
-    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
-        this.usuarioRepository = usuarioRepository;
-        this.passwordEncoder = passwordEncoder;
+    public UsuarioService(UsuarioRepository usuarios, PasswordEncoder senhaEncoder) {
+        this.usuarios = usuarios;
+        this.senhaEncoder = senhaEncoder;
     }
 
-    public UsuarioResponseDto cadastrarUsuario(UsuarioRequestDto usuarioRequestDto){
-        if(usuarioRepository.findByCpf(usuarioRequestDto.cpf()).isPresent()) {
-            throw new EntidadeJaCadastradaException("Cpf já cadastrado");
+    @Transactional
+    public UsuarioResponseDto cadastrarUsuario(UsuarioRequestDto req) {
+        if (req.tipo() == null || req.tipo() == TipoUsuario.BIBLIOTECARIO) {
+            throw new RegraNegocioException("Cadastro público permitido somente para ALUNO ou PROFESSOR");
         }
-        if(usuarioRepository.findByEmail(usuarioRequestDto.email()).isPresent()) {
+        if (req.senha() == null || req.senha().isBlank()) {
+            throw new RegraNegocioException("A senha é obrigatória");
+        }
+        if (usuarios.findByCpf(req.cpf()).isPresent()) {
+            throw new EntidadeJaCadastradaException("CPF já cadastrado");
+        }
+        if (usuarios.findByEmail(req.email()).isPresent()) {
             throw new EntidadeJaCadastradaException("Email já cadastrado");
         }
-
-        String senha = passwordEncoder.encode(usuarioRequestDto.senha());
-
-
-        Usuario usuario = new Usuario(usuarioRequestDto.nome(), usuarioRequestDto.cpf(), usuarioRequestDto.email(), usuarioRequestDto.tipo(), senha);
-        Usuario salvo = usuarioRepository.save(usuario);
-
-        return new UsuarioResponseDto(salvo);
+        Usuario novo = new Usuario(req.nome(), req.cpf(), req.email(), req.tipo(), senhaEncoder.encode(req.senha()));
+        return new UsuarioResponseDto(usuarios.save(novo));
     }
 
+    @Transactional(readOnly = true)
     public List<UsuarioResponseDto> listarTodos() {
-        return usuarioRepository.findAll().stream()
-                .map(UsuarioResponseDto::new)
-                .collect(Collectors.toList());
+        return usuarios.findAll().stream().map(UsuarioResponseDto::new).toList();
     }
 
+    @Transactional(readOnly = true)
     public UsuarioResponseDto buscarPorId(Long id) {
-        Usuario usuario = usuarioRepository.findById(id)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário não encontrado com o ID: " + id));
+        Usuario usuario = usuarios.findById(id)
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário não encontrado"));
         return new UsuarioResponseDto(usuario);
     }
 
+    @Transactional
     public void desativar(Long id) {
-
-        Usuario usuario = usuarioRepository.findById(id)
-                .orElseThrow(()-> new EntidadeNaoEncontradaException("Usuario não encontrado"));
-
+        Usuario usuario = usuarios.findById(id)
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário não encontrado"));
         usuario.desativar();
     }
 }
